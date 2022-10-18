@@ -1,7 +1,12 @@
 module.exports = {
 	root: true,
 	parser: '@typescript-eslint/parser',
-	extends: ['airbnb-base', 'airbnb-typescript/base', 'prettier'],
+	extends: [
+		'eslint:recommended',
+		'plugin:@typescript-eslint/recommended',
+		'plugin:@typescript-eslint/recommended-requiring-type-checking',
+		'prettier'
+	],
 	plugins: ['svelte3', '@typescript-eslint'],
 	ignorePatterns: [
 		'node_modules',

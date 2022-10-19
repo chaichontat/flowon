@@ -1,122 +1,119 @@
 <script lang="ts">
+	import Axis from '$src/components/axis.svelte';
+	import Contours from '$src/components/contours.svelte';
+	import Points from '$src/components/points.svelte';
 	import * as d3 from 'd3';
-	import { onMount } from 'svelte';
+	import { onMount, setContext } from 'svelte';
+	import type { Writable } from 'svelte/store';
+	import colors from 'tailwindcss/colors';
 	import Dropdown from './dropdown.svelte';
-	import { genmine } from './mine';
-	import { what } from './what';
 
 	export let data: Record<string, number>[];
 	export let channels: string[];
+	export let storeSelect: Writable<[[number, number], [number, number]] | undefined>;
+
 	export const width = 400;
 	export const height = 400;
+	const padding = { top: 20, right: 20, bottom: 20, left: 60 };
+	setContext('params', { width, height, padding });
 
 	let svg: SVGSVGElement;
-	let canvas: HTMLCanvasElement;
+	let xScale: d3.ScaleLinear<number, number>;
+	let yScale: d3.ScaleLinear<number, number>;
 	let x = channels[0];
 	let y = channels[0];
 
-	// draw the points based on their current layout
-	function draw(
-		d: typeof data,
-		scales?: { xScale: d3.ScaleLinear<number, number>; yScale: d3.ScaleLinear<number, number> }
-	) {
-		const ctx = canvas.getContext('2d')!;
-		ctx.save();
-		// erase what is on the canvas currently
-		ctx.clearRect(0, 0, width, height);
-		d.forEach((dd) => {
-			ctx.fillStyle = 'black';
-			scales
-				? ctx.fillRect(scales.xScale(dd[x] * 3), scales.yScale(dd[y] * 3), 1, 1)
-				: ctx.fillRect(dd[x], dd[y], 1, 1);
-			// ctx.arc(xScale(dd[x]), yScale(dd[y]), 1, 0, 2 * Math.PI);
-		});
-		// ctx.scale(1 / 3, 1 / 3);
-		ctx.restore();
-	}
+	export let selected = [];
 
-	const duration = 500;
-	const ease = d3.easeCubic;
-	let oldY = '';
-	let oldX = '';
+	const brush = d3.brush().on('start brush end', ({ selection }) => {
+		const points = d3.select(svg).selectAll('circle');
+		points.each((d) => (d.selected = false));
+		selected.length = 0;
+		if (selection) search(selection);
+		points.classed('point--selected', (d) => d.selected);
+	});
+
+	let quadtree: d3.Quadtree<[number, number]>;
 	onMount(() => {
 		setTimeout(() => {
 			y = channels[0];
 			x = channels[1];
 		}, 50);
+
+		d3.select(svg).call(brush);
 	});
 
-	function setDPI(scaleFactor: number) {
-		// Set up CSS size.
-		canvas.style.width = canvas.style.width || canvas.width + 'px';
-		canvas.style.height = canvas.style.height || canvas.height + 'px';
+	function search([[xmin, ymax], [xmax, ymin]]) {
+		if (!quadtree) return;
+		xmin = xScale.invert(xmin);
+		xmax = xScale.invert(xmax);
+		ymin = yScale.invert(ymin);
+		ymax = yScale.invert(ymax);
 
-		// Get size information.
-		const width = parseFloat(canvas.style.width);
-		const height = parseFloat(canvas.style.height);
+		console.log(xmin, xmax, ymin, ymax);
 
-		// Backup the canvas contents.
-		const oldScale = canvas.width / width;
-		const backupScale = scaleFactor / oldScale;
-		const backup = canvas.cloneNode(false) as HTMLCanvasElement;
-		backup.getContext('2d')!.drawImage(canvas, 0, 0);
-
-		// Resize the canvas.
-		const ctx = canvas.getContext('2d')!;
-		canvas.width = Math.ceil(width * scaleFactor);
-		canvas.height = Math.ceil(height * scaleFactor);
-
-		// Redraw the canvas image and scale future draws.
-		ctx.setTransform(backupScale, 0, 0, backupScale, 0, 0);
-		ctx.drawImage(backup, 0, 0);
-		ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
+		quadtree.visit((node, x1, y1, x2, y2) => {
+			if (!node.length) {
+				do {
+					let d = node.data;
+					d.selected = d[x] >= xmin && d[x] < xmax && d[y] >= ymin && d[y] < ymax;
+					if (d.selected) selected.push(d);
+				} while ((node = node.next));
+			}
+			return x1 >= xmax || y1 >= ymax || x2 < xmin || y2 < ymin;
+		});
 	}
 
 	$: if (svg) {
+		const isLog = (v?: string) => !v?.includes('FSC') && !v?.includes('SSC');
 		const extent = [
-			[0, x?.includes('FSC') || x?.includes('SSC') ? 262144 : d3.max(data, (d) => d[x])],
-			[0, y?.includes('FSC') || y?.includes('SSC') ? 262144 : d3.max(data, (d) => d[y] + 1)]
+			[isLog(x) ? 1 : 0, 262144],
+			[isLog(y) ? 1 : 0, 262144]
 		];
 
-		const xScale = d3.scaleLinear().domain(extent[0]).range([0, width]);
-		const yScale = d3.scaleLinear().domain(extent[1]).range([height, 0]);
-		const scales = { xScale, yScale };
-		// const scales = genmine(svg, data, x, y, width, height);
-		if (scales) {
-			if (oldX && oldY && (oldX !== x || oldY !== y)) {
-				const source = data.map((d) => ({
-					[x]: scales.xScale(d[oldX]),
-					[y]: scales.yScale(d[oldY])
-				}));
-				const dest = data.map((d) => ({
-					[x]: scales.xScale(d[x]),
-					[y]: scales.yScale(d[y])
-				}));
-				const interpolator = d3.interpolateArray(source, dest);
-				const timer = d3.timer((elapsed: number) => {
-					// compute how far through the animation we are (0 to 1)
-					const t = Math.min(1, ease(elapsed / duration));
-					draw(interpolator(t));
-					setDPI(3);
+		quadtree = d3
+			.quadtree()
+			.extent([
+				[-1, -1],
+				[262144, 262144]
+			])
+			.x((d) => d[x])
+			.y((d) => d[y])
+			.addAll(data);
 
-					// if this animation is over
-					if (t === 1) timer.stop();
-				}, 1);
-				console.log(interpolator(0.5));
-			}
-			oldX = x;
-			oldY = y;
-		}
+		const x_ = isLog(x) ? d3.scaleLog() : d3.scaleLinear();
+		const y_ = isLog(y) ? d3.scaleLog() : d3.scaleLinear();
+		xScale = x_
+			.domain(extent[0])
+			.range([padding.left, width - padding.right])
+			.clamp(true)
+			.nice();
+		yScale = y_
+			.domain(extent[1])
+			.range([height - padding.bottom, padding.top])
+			.clamp(true)
+			.nice();
 	}
-
-	// onMount(async () => {
-	// 	await genmine(svg, data);
-	// });
+	// const scales = { xScale, yScale };
+	// const scales = genmine(svg, data, x, y, width, height);
 </script>
 
-<Dropdown {channels} bind:curr={y} />
-<div>
-	<svg bind:this={svg} {width} {height} />
-	<canvas class="border" bind:this={canvas} {width} {height} />
-	<Dropdown {channels} bind:curr={x} />
-</div>
+<section>
+	<Dropdown {channels} bind:curr={y} />
+	<div class="flex items-end">
+		<svg bind:this={svg} {width} {height}>
+			<Points {data} {x} {y} {xScale} {yScale} />
+			<!-- <Contours {data} {x} {y} {xScale} {yScale} /> -->
+			<Axis axis="left" scale={yScale} />
+			<Axis axis="bottom" scale={xScale} />
+		</svg>
+		<!-- <canvas class="border" bind:this={canvas} {width} {height} /> -->
+		<Dropdown {channels} bind:curr={x} />
+	</div>
+</section>
+
+<style lang="postcss">
+	svg :global(.point--selected) {
+		fill: red;
+	}
+</style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Cluster from '$src/lib/cluster.svelte';
 	import { processFCS } from '$src/lib/mine';
 	import Observe from '$src/lib/observe.svelte';
 	import Scatter from '$src/lib/scatter.svelte';
@@ -211,11 +212,9 @@
 	const height = 800;
 </script>
 
-<div class="meh">
-	<!-- <svg id="chart" bind:this={svg} {width} {height} /> -->
-	<!-- <svg id="chart2" bind:this={svg2} {width} {height} /> -->
+<!-- <svg id="chart" bind:this={svg} {width} {height} /> -->
+<!-- <svg id="chart2" bind:this={svg2} {width} {height} /> -->
 
-	<!-- <Observe {data} {channels} /> -->
-	<!-- <svg id="playground" /> -->
-	<Scatter {data} {channels} />
-</div>
+<!-- <Observe {data} {channels} /> -->
+<!-- <svg id="playground" /> -->
+<Cluster {data} {channels} />

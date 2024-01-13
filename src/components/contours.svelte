@@ -14,7 +14,7 @@
 	function update(xScale, yScale) {
 		const contours = d3
 			.contourDensity()
-			.thresholds(25)
+			.thresholds(20)
 			.x((d) => xScale(d[x]))
 			.y((d) => yScale(d[y]))
 			.bandwidth(20);

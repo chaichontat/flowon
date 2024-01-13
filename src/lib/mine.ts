@@ -4,13 +4,16 @@ import parseFCS from './fcs';
 
 export function processFCS(buf: ArrayBuffer) {
 	const fcs = parseFCS(buf);
+
+	console.log(fcs);
+
 	const channels = fcs.parameters.map((x, i) => x[`$P${i + 1}N`]) as string[];
 	const data = fcs.data.map((x) => {
 		const obj: Record<string, number> = {};
 		channels.forEach((y, i) => (obj[y] = x[i]));
 		return obj;
 	});
-	return { data, channels };
+	return { data, channels, text: fcs.text };
 }
 
 export function genmine(

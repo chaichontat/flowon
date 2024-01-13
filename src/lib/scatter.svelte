@@ -1,11 +1,11 @@
 <script lang="ts">
 	import Axis from '$src/components/axis.svelte';
+	import Canvas from '$src/components/canvas.svelte';
 	import Contours from '$src/components/contours.svelte';
-	import Points from '$src/components/points.svelte';
 	import * as d3 from 'd3';
+	import { throttle } from 'lodash-es';
 	import { onMount, setContext } from 'svelte';
 	import type { Writable } from 'svelte/store';
-	import colors from 'tailwindcss/colors';
 	import Dropdown from './dropdown.svelte';
 
 	export let data: Record<string, number>[];
@@ -25,39 +25,45 @@
 
 	export let selected = [];
 
-	const brush = d3.brush().on('start brush end', ({ selection }) => {
+	const processBrush = throttle((selection: [[number, number], [number, number]]) => {
 		const points = d3.select(svg).selectAll('circle');
 		points.each((d) => (d.selected = false));
 		selected.length = 0;
 		if (selection) search(selection);
-		points.classed('point--selected', (d) => d.selected);
-	});
+	}, 30);
+
+	const brush = d3
+		.brush()
+		.on('start brush end', ({ selection }) => processBrush(selection))
+		.extent([
+			[padding.left, padding.top],
+			[width - padding.right, height - padding.bottom]
+		]);
 
 	let quadtree: d3.Quadtree<[number, number]>;
 	onMount(() => {
 		setTimeout(() => {
 			y = channels[0];
 			x = channels[1];
-		}, 50);
+		}, 100);
 
 		d3.select(svg).call(brush);
 	});
 
 	function search([[xmin, ymax], [xmax, ymin]]) {
+		selected.length = 0;
 		if (!quadtree) return;
 		xmin = xScale.invert(xmin);
 		xmax = xScale.invert(xmax);
 		ymin = yScale.invert(ymin);
 		ymax = yScale.invert(ymax);
 
-		console.log(xmin, xmax, ymin, ymax);
-
 		quadtree.visit((node, x1, y1, x2, y2) => {
 			if (!node.length) {
 				do {
 					let d = node.data;
-					d.selected = d[x] >= xmin && d[x] < xmax && d[y] >= ymin && d[y] < ymax;
-					if (d.selected) selected.push(d);
+					// d.selected =
+					if (d[x] >= xmin && d[x] < xmax && d[y] >= ymin && d[y] < ymax) selected.push(d.idx);
 				} while ((node = node.next));
 			}
 			return x1 >= xmax || y1 >= ymax || x2 < xmin || y2 < ymin;
@@ -71,12 +77,11 @@
 			[isLog(y) ? 1 : 0, 262144]
 		];
 
+		console.log(extent);
+
 		quadtree = d3
 			.quadtree()
-			.extent([
-				[-1, -1],
-				[262144, 262144]
-			])
+			.extent(extent)
 			.x((d) => d[x])
 			.y((d) => d[y])
 			.addAll(data);
@@ -86,28 +91,40 @@
 		xScale = x_
 			.domain(extent[0])
 			.range([padding.left, width - padding.right])
-			.clamp(true)
-			.nice();
+			.clamp(true);
+		xScale.type = isLog(x) ? 'log' : 'linear';
+
 		yScale = y_
 			.domain(extent[1])
 			.range([height - padding.bottom, padding.top])
-			.clamp(true)
-			.nice();
+			.clamp(true);
+		yScale.type = isLog(y) ? 'log' : 'linear';
+
+		console.log(yScale.domain(), yScale.range());
 	}
 	// const scales = { xScale, yScale };
 	// const scales = genmine(svg, data, x, y, width, height);
+	let showContours = false;
 </script>
 
 <section>
 	<Dropdown {channels} bind:curr={y} />
-	<div class="flex items-end">
-		<svg bind:this={svg} {width} {height}>
-			<Points {data} {x} {y} {xScale} {yScale} />
-			<!-- <Contours {data} {x} {y} {xScale} {yScale} /> -->
-			<Axis axis="left" scale={yScale} />
-			<Axis axis="bottom" scale={xScale} />
-		</svg>
-		<!-- <canvas class="border" bind:this={canvas} {width} {height} /> -->
+	<label>
+		<input type="checkbox" bind:checked={showContours} />
+		<span class="pointer-events-none">Show Contours </span>
+	</label>
+	<div class="relative flex items-end">
+		<div class="relative">
+			<svg class="absolute" bind:this={svg} {width} {height}>
+				<!-- <Points {data} {x} {y} {xScale} {yScale} /> -->
+				{#if showContours}
+					<Contours {data} {x} {y} {xScale} {yScale} />
+				{/if}
+				<Axis axis="left" scale={yScale} />
+				<Axis axis="bottom" scale={xScale} />
+			</svg>
+			<Canvas {data} {x} {y} {xScale} {yScale} />
+		</div>
 		<Dropdown {channels} bind:curr={x} />
 	</div>
 </section>

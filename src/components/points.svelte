@@ -15,7 +15,7 @@
 		const s = d3.select(g);
 		const t = s.transition().duration(750);
 
-		const toUpdate = s.selectAll('circle').data(data);
+		const toUpdate = s.selectAll('circle').data(data, (d) => d.idx);
 
 		toUpdate
 			.transition()
@@ -29,11 +29,10 @@
 			.append('circle')
 			.attr('r', 1)
 			.attr('opacity', 0.3)
-			.transition()
 			.attr('cx', (d) => xScale(d[x]))
 			.attr('cy', (d) => yScale(d[y]));
 
-		toUpdate.exit().transition().attr('cy', 0).remove();
+		toUpdate.exit().remove();
 	}
 
 	$: if (g) genmine(data, x, y);

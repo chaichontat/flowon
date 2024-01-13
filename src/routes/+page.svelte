@@ -87,7 +87,9 @@
 	let text: ReturnType<typeof processFCS>['text'];
 
 	onMount(async () => {
-		const buf = await fetch('/Specimen_002_1E5_allchans_P2.fcs').then((x) => x.arrayBuffer());
+		const buf = await fetch('./flowon/Specimen_002_1E5_allchans_P2.fcs').then((x) =>
+			x.arrayBuffer()
+		);
 		({ data, channels, text } = processFCS(buf));
 		data = data.map((x, i) => ({ ...x, idx: i }));
 

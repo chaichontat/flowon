@@ -8,7 +8,14 @@ const config = {
 	preprocess: preprocess({ postcss: true }),
 
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		alias: {
+			"$src/*": "src/*",
+			"$comps/*": "src/components/*",
+			"$lib": "src/lib",
+			"$lib/*": "src/lib/*"
+		}
+
 	}
 };
 

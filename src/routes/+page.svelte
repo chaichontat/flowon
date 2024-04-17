@@ -82,26 +82,27 @@
 	// 		.attr('fill', 'steelblue');
 	// }
 
-	let data: Record<string, number>[] = [];
-	let channels: string[] = [];
-	let text: ReturnType<typeof processFCS>['text'];
+	export let data;
+	$: ({ arrayBuf } = data);
 
-	onMount(async () => {
-		const buf = await fetch('./Specimen_002_1E5_allchans_P2.fcs').then((x) => x.arrayBuffer());
-		({ data, channels, text } = processFCS(buf));
-		data = data.map((x, i) => ({ ...x, idx: i }));
+	// onMount(async () => {
+	// 	({ records, channels, text } = processFCS(await ));
+	// 	records = records.map((x, i) => ({ ...x, idx: i }));
 
-		// const c = d3
-		// 	.select(pl)
-		// 	.selectAll('path')
-		// 	.on('mouseover', (d: MouseEvent) => {
-		// 		d.target!.setAttribute('stroke-width', 2);
-		// 		console.log(d.target);
-		// 	})
-		// 	.on('mouseout', (d: MouseEvent) => {
-		// 		d.target!.setAttribute('stroke-width', 0.25);
-		// 	});
-	});
+	// const c = d3
+	// 	.select(pl)
+	// 	.selectAll('path')
+	// 	.on('mouseover', (d: MouseEvent) => {
+	// 		d.target!.setAttribute('stroke-width', 2);
+	// 		console.log(d.target);
+	// 	})
+	// 	.on('mouseout', (d: MouseEvent) => {
+	// 		d.target!.setAttribute('stroke-width', 0.25);
+	// 	});
 </script>
 
-<Cluster {data} {channels} {text} />
+{#await arrayBuf.then(processFCS)}
+	Loading
+{:then { records, channels, text }}
+	<Cluster data={records} {channels} {text} />
+{/await}

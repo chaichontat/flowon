@@ -21,7 +21,7 @@
 	let xScale: d3.ScaleLinear<number, number>;
 	let yScale: d3.ScaleLinear<number, number>;
 	let x = channels[0];
-	let y = channels[0];
+	let y = channels[1];
 
 	export let selected = [];
 
@@ -42,11 +42,6 @@
 
 	let quadtree: d3.Quadtree<[number, number]>;
 	onMount(() => {
-		setTimeout(() => {
-			y = channels[0];
-			x = channels[1];
-		}, 100);
-
 		d3.select(svg).call(brush);
 	});
 

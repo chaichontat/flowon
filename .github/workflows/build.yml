@@ -25,10 +25,10 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('pnpm-lock.yml') }}
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm i
 
       - name: Build Svelte
-        run: npm run build
+        run: pnpm run build
 
       - name: Fix permissions
         run: |

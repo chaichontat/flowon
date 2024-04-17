@@ -10,6 +10,20 @@
 	import Colors from 'tailwindcss/colors';
 	import parseFCS from '../lib/fcs';
 
+	import { page } from '$app/stores';
+	import { error } from '@sveltejs/kit';
+
+	let arrayBuf: Promise<ArrayBuffer> | undefined;
+
+	onMount(() => {
+		const getURL = $page.url.searchParams.get('url');
+		if (!getURL || !getURL.endsWith('.fcs')) {
+			error(401, 'Invalid URL. URL must ends with .fcs.');
+		}
+
+		arrayBuf = fetch(getURL).then((x) => x.arrayBuffer());
+	});
+
 	// function genKDE(data, x, y, bins = 128) {
 	// 	const extent = [
 	// 		[0, d3.max(data, (d) => d[x])],
@@ -81,10 +95,6 @@
 	// 		.attr('r', 1)
 	// 		.attr('fill', 'steelblue');
 	// }
-
-	export let data;
-	$: ({ arrayBuf } = data);
-
 	// onMount(async () => {
 	// 	({ records, channels, text } = processFCS(await ));
 	// 	records = records.map((x, i) => ({ ...x, idx: i }));
@@ -101,8 +111,10 @@
 	// 	});
 </script>
 
-{#await arrayBuf.then(processFCS)}
-	Loading
-{:then { records, channels, text }}
-	<Cluster data={records} {channels} {text} />
-{/await}
+{#if arrayBuf}
+	{#await arrayBuf.then(processFCS)}
+		Loading
+	{:then { records, channels, text }}
+		<Cluster data={records} {channels} {text} />
+	{/await}
+{/if}

@@ -8,12 +8,14 @@ export function processFCS(buf: ArrayBuffer) {
 	console.log(fcs);
 
 	const channels = fcs.parameters.map((x, i) => x[`$P${i + 1}N`]) as string[];
-	const data = fcs.data.map((x) => {
-		const obj: Record<string, number> = {};
-		channels.forEach((y, i) => (obj[y] = x[i]));
-		return obj;
-	});
-	return { data, channels, text: fcs.text };
+	const records = fcs.data
+		.map((x) => {
+			const obj: Record<string, number> = {};
+			channels.forEach((y, i) => (obj[y] = x[i]));
+			return obj;
+		})
+		.map((x, i) => ({ ...x, idx: i }));
+	return { records, channels, text: fcs.text };
 }
 
 export function genmine(

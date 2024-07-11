@@ -8,10 +8,8 @@
 
 	let canvas: HTMLCanvasElement;
 	export let data: Record<string, number>[];
-	export let x: string;
-	export let y: string;
-	export let xScale: d3.ScaleLinear<number, number>;
-	export let yScale: d3.ScaleLinear<number, number>;
+	export let x: {chan:string, scale: d3.ScaleLinear<number, number>};
+	export let y: {chan:string, scale: d3.ScaleLinear<number, number>};
 	let fills = [];
 
 	const { width, height, padding } = getContext('params') as {
@@ -52,10 +50,15 @@
 		// });
 
 		// return;
-		if (!canvas || !d) return;
+		if (!canvas) {
+			throw new Error("canvas is not defined");
+		};
+
+		if (!d) {
+			throw new Error("data is not defined");
+		};
 
 		const ctx = canvas.getContext('2d')!;
-
 		ctx.save();
 
 		// erase what is on the canvas currently
@@ -75,7 +78,6 @@
 			ctx.fill();
 			ctx.closePath();
 		}
-
 		// ctx.scale(1 / 3, 1 / 3);
 		ctx.restore();
 
@@ -108,12 +110,12 @@
 		ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
 	}
 
-	let oldY = undefined as { y: string; yScale: d3.ScaleLinear<number, number> } | undefined;
-	let oldX = undefined as { x: string; xScale: d3.ScaleLinear<number, number> } | undefined;
+	let oldY = undefined as { chan: string; yScale: d3.ScaleLinear<number, number> } | undefined;
+	let oldX = undefined as { chan: string; xScale: d3.ScaleLinear<number, number> } | undefined;
 	let oldFills = undefined as string[] | undefined;
 
-	export function transition(x: string, y: string) {
-		if (!xScale || !yScale) return;
+	export function transition(x: {chan:string, scale: d3.ScaleLinear<number, number>}, y: {chan:string, scale: d3.ScaleLinear<number, number>}) {
+		if (!canvas) return
 		// const toSendScale = [
 		// 	{
 		// 		type: xScale.type,
@@ -140,17 +142,22 @@
 		const duration = 500;
 		const ease = d3.easeCubic;
 
-		if (oldX?.xScale && oldY?.yScale && oldFills && (oldX.x !== x || oldY.y !== y)) {
-			console.log(oldX.x, x, oldY.y, y);
+		let go = (oldX?.chan !== x.chan || oldY?.chan !== y.chan || oldX?.scale?.type !== x.scale.type || oldY?.scale?.type !== y.scale.type);
 
-			console.log('transition', x, y);
+		console.log(x.scale.type, y.scale.type);
+
+
+		if (oldX?.xScale && oldY?.yScale && oldFills && go) {
+			console.log("transition")
+			// console.log(oldX.x, x, oldY.y, y);
+			// console.log('transition', x, y);
 			const source = data.map((d) => ({
-				[x]: oldX!.xScale(d[oldX!.x]),
-				[y]: oldY!.yScale(d[oldY!.y])
+				x: oldX!.xScale(d[oldX!.chan]),
+				y: oldY!.yScale(d[oldY!.chan])
 			}));
 			const dest = data.map((d) => ({
-				[x]: xScale(d[x]),
-				[y]: yScale(d[y])
+				x: x.scale(d[x.chan]),
+				y: y.scale(d[y.chan])
 			}));
 			const interpolator = d3.interpolateArray(source, dest);
 			const cint = d3.interpolateArray(oldFills, fills);
@@ -158,14 +165,14 @@
 				throttle((elapsed: number) => {
 					// compute how far through the animation we are (0 to 1)
 					const t = Math.min(1, ease(elapsed / duration));
-					draw(interpolator(t), x, y, undefined, cint(t));
+					draw(interpolator(t), "x", "y", undefined, cint(t));
 					// if this animation is over
 					if (t === 1) timer.stop();
-				}, 10)
+				}, 20)
 			);
 		}
-		oldX = { x, xScale: xScale?.copy() };
-		oldY = { y, yScale: yScale?.copy() };
+		oldX = { chan:x.chan, xScale: x.scale?.copy() };
+		oldY = { chan:y.chan, yScale: y.scale?.copy() };
 		oldFills = fills;
 	}
 	let worker: Worker | undefined = undefined;
@@ -179,12 +186,11 @@
 		// worker.addEventListener('message', (e) => {
 		// 	console.log('message', e);
 		// });
+		fills = x.scale ? runkde(data, x, y, x.scale, y.scale)?.map(d3.interpolateTurbo) : [];
+		draw(data, x.chan, y.chan, { xScale: x.scale, yScale: y.scale }, fills);
 	});
 
-	const newDraw = (data) => draw(data, x, y, { xScale, yScale }, fills);
-	$: fills = xScale ? runkde(data, x, y, xScale, yScale)?.map(d3.interpolateTurbo) : [];
-
-	$: newDraw(data);
+	$: fills = x.scale ? runkde(data, x.chan, y.chan, x.scale, y.scale)?.map(d3.interpolateTurbo) : [];
 	$: transition(x, y);
 </script>
 

@@ -20,8 +20,9 @@
 	let svg: SVGSVGElement;
 	let xScale: d3.ScaleLinear<number, number>;
 	let yScale: d3.ScaleLinear<number, number>;
-	let x = channels[0];
-	let y = channels[1];
+	let x = {chan: channels[0], isLog: false};
+	let y = {chan: channels[1], isLog: false};
+
 
 	export let selected = [];
 
@@ -58,44 +59,49 @@
 				do {
 					let d = node.data;
 					// d.selected =
-					if (d[x] >= xmin && d[x] < xmax && d[y] >= ymin && d[y] < ymax) selected.push(d.idx);
+					if (d[x.chan] >= xmin && d[x.chan] < xmax && d[y.chan] >= ymin && d[y.chan] < ymax) selected.push(d.idx);
 				} while ((node = node.next));
 			}
 			return x1 >= xmax || y1 >= ymax || x2 < xmin || y2 < ymin;
 		});
+		selected = selected
 	}
 
-	$: if (svg) {
-		const isLog = (v?: string) => !v?.includes('FSC') && !v?.includes('SSC');
-		const extent = [
-			[isLog(x) ? 1 : 0, 262144],
-			[isLog(y) ? 1 : 0, 262144]
-		];
 
-		console.log(extent);
+	function updateScales(x: {chan:string, isLog: boolean}, y: {chan:string, isLog: boolean}) {
+		const extent = [
+			[x.isLog ? 1 : 0, 262144],
+			[y.isLog ? 1 : 0, 262144]
+		];
 
 		quadtree = d3
 			.quadtree()
 			.extent(extent)
-			.x((d) => d[x])
-			.y((d) => d[y])
+			.x((d) => d[x.chan])
+			.y((d) => d[y.chan])
 			.addAll(data);
 
-		const x_ = isLog(x) ? d3.scaleLog() : d3.scaleLinear();
-		const y_ = isLog(y) ? d3.scaleLog() : d3.scaleLinear();
-		xScale = x_
+		const x_ = x.isLog ? d3.scaleLog() : d3.scaleLinear();
+		const y_ = y.isLog ? d3.scaleLog() : d3.scaleLinear();
+		const xs = x_
 			.domain(extent[0])
 			.range([padding.left, width - padding.right])
 			.clamp(true);
-		xScale.type = isLog(x) ? 'log' : 'linear';
+		xs.type = x.isLog ? 'log' : 'linear';
 
-		yScale = y_
+		const ys = y_
 			.domain(extent[1])
 			.range([height - padding.bottom, padding.top])
 			.clamp(true);
-		yScale.type = isLog(y) ? 'log' : 'linear';
+		ys.type = y.isLog ? 'log' : 'linear';
 
-		console.log(yScale.domain(), yScale.range());
+		console.log(xs.domain(), ys.range());
+		return {xScale: xs, yScale: ys};
+	}
+
+	$: if (svg) {
+		({xScale, yScale} = updateScales(x, y));
+		console.log("updateScales", xScale, yScale);
 	}
 	// const scales = { xScale, yScale };
 	// const scales = genmine(svg, data, x, y, width, height);
@@ -103,7 +109,7 @@
 </script>
 
 <section>
-	<Dropdown {channels} bind:curr={y} />
+	<Dropdown {channels} bind:curr={y.chan} bind:isLog={y.isLog} />
 	<label>
 		<input type="checkbox" bind:checked={showContours} />
 		<span class="pointer-events-none">Show Contours </span>
@@ -113,14 +119,16 @@
 			<svg class="absolute" bind:this={svg} {width} {height}>
 				<!-- <Points {data} {x} {y} {xScale} {yScale} /> -->
 				{#if showContours}
-					<Contours {data} {x} {y} {xScale} {yScale} />
+					<Contours {data} x={x.chan} y={y.chan} {xScale} {yScale} />
 				{/if}
 				<Axis axis="left" scale={yScale} />
 				<Axis axis="bottom" scale={xScale} />
 			</svg>
-			<Canvas {data} {x} {y} {xScale} {yScale} />
+			{#if xScale && yScale}
+				<Canvas {data} x={{chan:x.chan, scale:xScale}} y={{chan:y.chan, scale:yScale}} />
+			{/if}
 		</div>
-		<Dropdown {channels} bind:curr={x} />
+		<Dropdown {channels} bind:curr={x.chan} bind:isLog={x.isLog} />
 	</div>
 </section>
 
